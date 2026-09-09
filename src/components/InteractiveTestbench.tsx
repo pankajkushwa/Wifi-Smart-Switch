@@ -12,7 +12,14 @@ import {
   ToggleLeft,
   Sliders,
   Radio,
-  Power
+  Power,
+  ShieldCheck,
+  Layers,
+  Bell,
+  Lightbulb,
+  Fan,
+  Plug,
+  Sparkles
 } from 'lucide-react';
 import { RelayChannelConfig, GangCount, FreeRTOSEvent, RelayState } from '../types/firmware';
 import { ESP_FACTORY_PROFILES } from '../data/espFactoryProfiles';
@@ -87,44 +94,111 @@ export const InteractiveTestbench: React.FC<InteractiveTestbenchProps> = ({
           </div>
         </div>
 
-        {/* Gang Model Switcher */}
-        <div className="flex flex-wrap items-center gap-2 mt-5 pt-4 border-t border-slate-100">
-          <span className="text-xs font-semibold text-slate-500 mr-2">Target Switch Model:</span>
-          {([1, 2, 4, 6, 8, 16] as GangCount[]).map((g) => (
-            <button
-              key={g}
-              id={`testbench-gang-${g}`}
-              onClick={() => setGangCount(g)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-mono font-semibold transition ${
-                gangCount === g 
-                  ? 'bg-blue-600 text-white shadow-xs font-bold' 
-                  : 'bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-              }`}
-            >
-              {g} Gang ({g} Relays)
-            </button>
-          ))}
+        {/* ESP32 Firmware Code Flasher & Hardware Authority Setup */}
+        <div className="mt-5 pt-4 border-t border-slate-100 space-y-3">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <div className="flex items-center space-x-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                <span className="text-xs font-bold text-slate-800">ESP32 Firmware Code Flasher (Hardware Authority Setup)</span>
+              </div>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Flash code to ESP32: Gang count is fixed by the firmware (1 switch = 1 gang, 2 switches = 2 gang). Peripherals (switch, fan, doorbell, socket) are loaded here. The mobile app never decides the gang.
+              </p>
+            </div>
+            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-emerald-50 text-emerald-700 border border-emerald-200">
+              Hardware Authority
+            </span>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-slate-600 mr-1">Load Code for Fixed Gang:</span>
+            {([1, 2, 3, 4, 6, 8, 12, 16] as GangCount[]).map((g) => (
+              <button
+                key={g}
+                id={`testbench-gang-${g}`}
+                onClick={() => setGangCount(g)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-mono font-semibold transition ${
+                  gangCount === g 
+                    ? 'bg-blue-600 text-white shadow-xs font-bold' 
+                    : 'bg-slate-100 text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                }`}
+              >
+                {g} Gang ({g} {g === 1 ? 'Switch' : 'Switches'})
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* Burned ESP32 Hardware Manifest Card */}
         {(() => {
           const manifest = ESP_FACTORY_PROFILES[gangCount];
           return (
-            <div className="mt-4 p-3.5 bg-slate-50 border border-blue-200/80 rounded-2xl flex flex-wrap items-center justify-between gap-3 text-xs">
-              <div className="flex items-center space-x-2.5">
-                <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-mono text-[10px] font-bold border border-blue-300">
-                  ESP-SIDE MANIFEST
-                </span>
-                <span className="font-mono text-slate-900 font-bold">{manifest.modelId}</span>
-                <span className="text-slate-300">•</span>
-                <span className="font-mono text-emerald-600 font-semibold">{manifest.serialNumber}</span>
+            <div className="mt-4 p-4 bg-slate-50 border border-blue-200/80 rounded-2xl space-y-3 text-xs">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center space-x-2.5">
+                  <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-800 font-mono text-[10px] font-bold border border-blue-300">
+                    BURNED IN FIRMWARE
+                  </span>
+                  <span className="font-mono text-slate-900 font-bold">{manifest.modelId}</span>
+                  <span className="text-slate-300">•</span>
+                  <span className="font-mono text-emerald-600 font-semibold">{manifest.serialNumber}</span>
+                  <span className="text-slate-300">•</span>
+                  <span className="font-mono text-blue-700 font-semibold">{manifest.gangCount}-Gang Fixed</span>
+                </div>
+                <div className="flex items-center space-x-3 text-[11px] text-slate-500 font-mono">
+                  <span>MAC: <strong className="text-slate-700">{manifest.macAddress}</strong></span>
+                  <span>•</span>
+                  <span>PCB: <strong className="text-slate-700">{manifest.hardwareRev}</strong></span>
+                </div>
               </div>
-              <div className="flex items-center space-x-3 text-[11px] text-slate-500 font-mono">
-                <span>MAC: <strong className="text-slate-700">{manifest.macAddress}</strong></span>
-                <span>•</span>
-                <span>PCB: <strong className="text-slate-700">{manifest.hardwareRev}</strong></span>
-                <span>•</span>
-                <span className="text-amber-700 font-semibold">Gangs & Loads Factory Fixed</span>
+
+              {/* Channels & Peripherals Defined in ESP32 */}
+              <div className="pt-2 border-t border-slate-200/60">
+                <span className="text-[11px] font-bold text-slate-700 block mb-2">
+                  Peripherals Loaded into ESP32 NVS & Firmware ({manifest.gangCount} Channels):
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                  {manifest.channels.map((ch) => {
+                    const isDoorbell = ch.loadType === 'doorbell';
+                    const isFan = ch.loadType === 'fan';
+                    const isSocket = ch.loadType === 'socket';
+                    const isChandelier = ch.loadType === 'chandelier';
+
+                    return (
+                      <div
+                        key={ch.gangId}
+                        className="px-2.5 py-1.5 bg-white rounded-xl border border-slate-200/80 flex items-center justify-between text-xs"
+                      >
+                        <div className="flex items-center space-x-2 truncate">
+                          <span className="w-5 h-5 rounded-md bg-slate-100 flex items-center justify-center shrink-0">
+                            {isDoorbell ? (
+                              <Bell className="w-3.5 h-3.5 text-amber-600" />
+                            ) : isFan ? (
+                              <Fan className="w-3.5 h-3.5 text-cyan-600" />
+                            ) : isSocket ? (
+                              <Plug className="w-3.5 h-3.5 text-emerald-600" />
+                            ) : isChandelier ? (
+                              <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                            ) : (
+                              <Lightbulb className="w-3.5 h-3.5 text-amber-500" />
+                            )}
+                          </span>
+                          <span className="font-semibold text-slate-800 truncate">
+                            G{ch.gangId}: {ch.factoryName}
+                          </span>
+                        </div>
+                        <span className="text-[10px] font-mono text-slate-500 shrink-0 ml-1">
+                          {isDoorbell ? 'Door Bell (Pulse)' : ch.loadType.toUpperCase()}
+                        </span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="text-[11px] text-slate-500 bg-white p-2.5 rounded-xl border border-slate-200/80 leading-relaxed">
+                🔒 <strong>ESP32 Authority Rule:</strong> When discovered in the mobile app (via Smart Life AP mode or Bluetooth), this exact gang count and peripheral mapping is reported. The mobile app never decides or changes the gang count.
               </div>
             </div>
           );

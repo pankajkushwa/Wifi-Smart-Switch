@@ -12,6 +12,7 @@
 #include "freertos/task.h"
 
 #include "device_config.h"
+#include "mqtt_config.h"
 #include "relay.h"
 #include "schedule_sync.h"
 #include "wifi_mqtt.h"
@@ -74,8 +75,8 @@ void app_init_subsystems(void) {
     /* 4. Offline Schedule Synchronizer */
     schedule_sync_init();
 
-    /* 5. Wi-Fi & MQTT Networking */
-    wifi_mqtt_init("SmartHome_2.4G", "HomePassword123", "mqtt://broker.hivemq.com:1883");
+    /* 5. Wi-Fi & MQTT Networking (Configured via mqtt_config.h) */
+    wifi_mqtt_init(CONFIG_WIFI_SSID, CONFIG_WIFI_PASSWORD, CONFIG_MQTT_BROKER_URI);
     wifi_mqtt_register_cmd_handler(app_handle_cloud_command);
 }
 

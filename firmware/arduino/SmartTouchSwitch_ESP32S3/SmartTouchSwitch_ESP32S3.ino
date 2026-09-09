@@ -9,6 +9,25 @@
 #include <WiFi.h>
 #include "relay_arduino.h"
 
+/* =========================================================================
+ * USER CONFIGURATION: ENTER YOUR WI-FI & MQTT BROKER DETAILS HERE:
+ * ========================================================================= */
+const char* WIFI_SSID       = "Home_Fiber_2.4G";
+const char* WIFI_PASS       = "HomePassword123";
+
+// MQTT Broker Connection Details:
+// Examples:
+//   - HiveMQ Public:      "broker.hivemq.com" (Port 1883)
+//   - EMQX Public:        "broker.emqx.io"    (Port 1883)
+//   - Home Assistant LAN: "192.168.1.100"     (Port 1883)
+const char* MQTT_BROKER     = "broker.hivemq.com";
+const int   MQTT_PORT       = 1883;
+const char* MQTT_USER       = "";                  // Optional: username (leave "" if unauthenticated)
+const char* MQTT_PASS       = "";                  // Optional: password (leave "" if unauthenticated)
+const char* MQTT_CLIENT_ID  = "ESP32S3_SmartSwitch_Ard";
+const char* MQTT_TOPIC_BASE = "smartswitch/ESP32S3-4G"; // Publishes to stat/ and listens to cmnd/
+/* ========================================================================= */
+
 // Hardware Configuration for 4-Gang Touch Switch
 const int RELAY_PINS[4] = {4, 5, 6, 7};
 const char* CHANNEL_NAMES[4] = {"Main Chandelier", "Ceiling Fan", "Ambient Downlights", "Balcony Strip Light"};

@@ -60,7 +60,7 @@ export default function App() {
     return createChannelsFromProfile(4, savedStates);
   });
 
-  const [activeView, setActiveView] = useState<'firmware' | 'mobile' | 'code-repo' | 'testbench' | 'roadmap' | 'scheduling'>('code-repo');
+  const [activeView, setActiveView] = useState<'firmware' | 'mobile' | 'code-repo' | 'testbench' | 'roadmap' | 'scheduling'>('mobile');
   const [isModule1Approved, setIsModule1Approved] = useState(false);
   const [showMobileCodeModal, setShowMobileCodeModal] = useState(false);
   const [isAddDeviceModalOpen, setIsAddDeviceModalOpen] = useState(false);

@@ -55,6 +55,48 @@ export const ESP_FACTORY_PROFILES: Record<GangCount, EspHardwareManifest> = {
       }
     ]
   },
+  3: {
+    serialNumber: 'SN:ESP32S3-3G-3104-0021',
+    modelId: 'LUMIERE-S3-3G-TOUCH',
+    hardwareRev: 'v2.4-SMD',
+    mcu: 'ESP32-S3-WROOM-1-N8R8',
+    gangCount: 3,
+    macAddress: '7C:DF:A1:42:0E:33',
+    buildDate: '2026-02-25',
+    isFactoryLocked: true,
+    channels: [
+      {
+        gangId: 1,
+        gpioPin: 4,
+        loadType: 'chandelier',
+        factoryName: 'Main Chandelier',
+        activeLevel: 'LOW',
+        defaultMode: 'LATCHING',
+        pulseDurationMs: 0,
+        isReadOnly: true,
+      },
+      {
+        gangId: 2,
+        gpioPin: 5,
+        loadType: 'fan',
+        factoryName: 'Ceiling Fan',
+        activeLevel: 'LOW',
+        defaultMode: 'LATCHING',
+        pulseDurationMs: 0,
+        isReadOnly: true,
+      },
+      {
+        gangId: 3,
+        gpioPin: 6,
+        loadType: 'doorbell',
+        factoryName: 'Front Door Bell',
+        activeLevel: 'LOW',
+        defaultMode: 'PULSE',
+        pulseDurationMs: 500,
+        isReadOnly: true,
+      }
+    ]
+  },
   4: {
     serialNumber: 'SN:ESP32S3-4G-2026-X883B',
     modelId: 'LUMIERE-S3-4G-TOUCH',
@@ -88,11 +130,11 @@ export const ESP_FACTORY_PROFILES: Record<GangCount, EspHardwareManifest> = {
       {
         gangId: 3,
         gpioPin: 6,
-        loadType: 'light',
-        factoryName: 'Ambient Downlights',
+        loadType: 'doorbell',
+        factoryName: 'Main Door Bell',
         activeLevel: 'LOW',
-        defaultMode: 'LATCHING',
-        pulseDurationMs: 0,
+        defaultMode: 'PULSE',
+        pulseDurationMs: 500,
         isReadOnly: true,
       },
       {
@@ -197,6 +239,30 @@ export const ESP_FACTORY_PROFILES: Record<GangCount, EspHardwareManifest> = {
       { gangId: 6, gpioPin: 9, loadType: 'fan', factoryName: 'Exhaust Fan', activeLevel: 'LOW', defaultMode: 'LATCHING', pulseDurationMs: 0, isReadOnly: true },
       { gangId: 7, gpioPin: 10, loadType: 'ac', factoryName: 'Air Conditioner', activeLevel: 'LOW', defaultMode: 'LATCHING', pulseDurationMs: 0, isReadOnly: true },
       { gangId: 8, gpioPin: 11, loadType: 'heater', factoryName: 'Water Geyser', activeLevel: 'LOW', defaultMode: 'LATCHING', pulseDurationMs: 0, isReadOnly: true },
+    ]
+  },
+  12: {
+    serialNumber: 'SN:ESP32S3-12G-8812-0092',
+    modelId: 'LUMIERE-S3-12G-COMM',
+    hardwareRev: 'v2.4-SMD',
+    mcu: 'ESP32-S3-WROOM-1-N8R8',
+    gangCount: 12,
+    macAddress: '7C:DF:A1:42:0E:82',
+    buildDate: '2026-03-09',
+    isFactoryLocked: true,
+    channels: [
+      { gangId: 1, gpioPin: 4, loadType: 'chandelier', factoryName: 'Main Chandelier', activeLevel: 'LOW', defaultMode: 'LATCHING', pulseDurationMs: 0, isReadOnly: true },
+      { gangId: 2, gpioPin: 5, loadType: 'fan', factoryName: 'Ceiling Fan', activeLevel: 'LOW', defaultMode: 'LATCHING', pulseDurationMs: 0, isReadOnly: true },
+      { gangId: 3, gpioPin: 6, loadType: 'light', factoryName: 'Ambient Downlights', activeLevel: 'LOW', defaultMode: 'LATCHING', pulseDurationMs: 0, isReadOnly: true },
+      { gangId: 4, gpioPin: 7, loadType: 'light', factoryName: 'Balcony Strip', activeLevel: 'LOW', defaultMode: 'LATCHING', pulseDurationMs: 0, isReadOnly: true },
+      { gangId: 5, gpioPin: 8, loadType: 'socket', factoryName: 'Media Console Socket', activeLevel: 'LOW', defaultMode: 'LATCHING', pulseDurationMs: 0, isReadOnly: true },
+      { gangId: 6, gpioPin: 9, loadType: 'fan', factoryName: 'Exhaust Booster', activeLevel: 'LOW', defaultMode: 'LATCHING', pulseDurationMs: 0, isReadOnly: true },
+      { gangId: 7, gpioPin: 10, loadType: 'ac', factoryName: 'Air Conditioner', activeLevel: 'LOW', defaultMode: 'LATCHING', pulseDurationMs: 0, isReadOnly: true },
+      { gangId: 8, gpioPin: 11, loadType: 'heater', factoryName: 'Water Geyser', activeLevel: 'LOW', defaultMode: 'LATCHING', pulseDurationMs: 0, isReadOnly: true },
+      { gangId: 9, gpioPin: 12, loadType: 'light', factoryName: 'Auxiliary Downlight', activeLevel: 'LOW', defaultMode: 'LATCHING', pulseDurationMs: 0, isReadOnly: true },
+      { gangId: 10, gpioPin: 13, loadType: 'light', factoryName: 'Terrace Spotlight', activeLevel: 'LOW', defaultMode: 'LATCHING', pulseDurationMs: 0, isReadOnly: true },
+      { gangId: 11, gpioPin: 14, loadType: 'light', factoryName: 'Cove LED Driver', activeLevel: 'LOW', defaultMode: 'LATCHING', pulseDurationMs: 0, isReadOnly: true },
+      { gangId: 12, gpioPin: 15, loadType: 'socket', factoryName: 'Garden Valve Socket', activeLevel: 'LOW', defaultMode: 'PULSE', pulseDurationMs: 3000, isReadOnly: true },
     ]
   },
   16: {

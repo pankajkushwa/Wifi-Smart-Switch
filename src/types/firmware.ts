@@ -1,10 +1,10 @@
-export type GangCount = 1 | 2 | 4 | 6 | 8 | 16;
+export type GangCount = 1 | 2 | 3 | 4 | 6 | 8 | 12 | 16;
 
 export type RelayMode = 'LATCHING' | 'MOMENTARY' | 'PULSE';
 
 export type RelayState = 0 | 1; // 0 = OFF, 1 = ON
 
-export type LoadType = 'light' | 'fan' | 'socket' | 'heater' | 'chandelier' | 'ac';
+export type LoadType = 'light' | 'fan' | 'socket' | 'heater' | 'chandelier' | 'ac' | 'doorbell' | 'switch';
 
 export interface EspHardwareChannel {
   gangId: number;              // 1-indexed gang number (1 to 16)

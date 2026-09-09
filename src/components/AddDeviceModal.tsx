@@ -16,9 +16,14 @@ import {
   Layers,
   Lock,
   ChevronRight,
-  Sparkles
+  Sparkles,
+  Bell,
+  Lightbulb,
+  Fan,
+  Plug,
+  ShieldCheck
 } from 'lucide-react';
-import { GangCount, EspHardwareManifest } from '../types/firmware';
+import { GangCount, EspHardwareManifest, LoadType } from '../types/firmware';
 import { ESP_FACTORY_PROFILES } from '../data/espFactoryProfiles';
 
 export interface DiscoveredEspDevice {
@@ -45,7 +50,6 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
   currentGangCount,
 }) => {
   const [step, setStep] = useState<'scanning' | 'select_device' | 'wifi_credentials' | 'connecting' | 'success'>('scanning');
-  const [discoveredDevices, setDiscoveredDevices] = useState<DiscoveredEspDevice[]>([]);
   const [selectedDevice, setSelectedDevice] = useState<DiscoveredEspDevice | null>(null);
   const [homeSsid, setHomeSsid] = useState('Home_Fiber_2.4G');
   const [homePassword, setHomePassword] = useState('SmartHome2026!');
@@ -55,7 +59,7 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
   const [assignedRoom, setAssignedRoom] = useState('Living Room');
   const [assignedIp, setAssignedIp] = useState('192.168.1.145');
 
-  // Generate realistic discovered ESP32 devices when modal opens
+  // Discover physical ESP32 device whose gang count & peripherals are determined by ESP32 firmware
   useEffect(() => {
     if (!isOpen) {
       setStep('scanning');
@@ -63,39 +67,20 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
       return;
     }
 
+    const initialGang = currentGangCount || 4;
+
     const timer = setTimeout(() => {
-      const active = ESP_FACTORY_PROFILES[currentGangCount];
-      const devices: DiscoveredEspDevice[] = [
-        {
-          ssid: `SmartSwitch-S3-${active.gangCount}G-${active.serialNumber.slice(-5)}`,
-          modelId: active.modelId,
-          serialNumber: active.serialNumber,
-          gangCount: active.gangCount,
-          rssi: -45,
-          mac: active.macAddress,
-          apIp: '192.168.4.1'
-        },
-        {
-          ssid: `SmartSwitch-S3-2G-9401`,
-          modelId: 'LUMIERE-S3-2G-DUO',
-          serialNumber: 'SN:ESP32S3-2G-9401-0045',
-          gangCount: 2,
-          rssi: -68,
-          mac: '7C:DF:A1:42:0E:25',
-          apIp: '192.168.4.1'
-        },
-        {
-          ssid: `SmartSwitch-S3-1G-8812`,
-          modelId: 'LUMIERE-S3-1G-MINI',
-          serialNumber: 'SN:ESP32S3-1G-8812-0012',
-          gangCount: 1,
-          rssi: -82,
-          mac: '7C:DF:A1:42:0E:10',
-          apIp: '192.168.4.1'
-        }
-      ];
-      setDiscoveredDevices(devices);
-      setSelectedDevice(devices[0]);
+      const active = ESP_FACTORY_PROFILES[initialGang];
+      const device: DiscoveredEspDevice = {
+        ssid: `SmartSwitch-S3-${active.gangCount}G-Setup`,
+        modelId: active.modelId,
+        serialNumber: active.serialNumber,
+        gangCount: active.gangCount,
+        rssi: -45,
+        mac: active.macAddress,
+        apIp: '192.168.4.1'
+      };
+      setSelectedDevice(device);
       setStep('select_device');
     }, 1800);
 
@@ -197,68 +182,38 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
           )}
 
           {/* STEP 2: SELECT DEVICE */}
-          {step === 'select_device' && (
+          {step === 'select_device' && selectedDevice && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
-                  <h4 className="text-sm font-bold text-slate-900">Discovered Smart Switches</h4>
-                  <p className="text-xs text-slate-500">Choose the switch you want to add to your home</p>
+                  <h4 className="text-sm font-bold text-slate-900">Device Detected</h4>
+                  <p className="text-xs text-slate-500">1 device ready to pair</p>
                 </div>
                 <span className="text-[11px] font-semibold bg-emerald-50 text-emerald-600 px-2.5 py-1 rounded-full border border-emerald-200/60 flex items-center space-x-1">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  <span>{discoveredDevices.length} ready to pair</span>
+                  <span>Ready</span>
                 </span>
               </div>
 
-              {/* List of found devices */}
-              <div className="space-y-2.5">
-                {discoveredDevices.map((dev) => {
-                  const isSelected = selectedDevice?.serialNumber === dev.serialNumber;
-                  return (
-                    <div
-                      key={dev.serialNumber}
-                      id={`select-device-${dev.serialNumber}`}
-                      onClick={() => setSelectedDevice(dev)}
-                      className={`p-4 rounded-2xl border transition-all cursor-pointer flex items-center justify-between ${
-                        isSelected 
-                          ? 'border-blue-600 bg-blue-50/60 shadow-sm' 
-                          : 'border-slate-200 hover:border-slate-300 bg-white'
-                      }`}
-                    >
-                      <div className="flex items-center space-x-3.5">
-                        <div className={`w-11 h-11 rounded-2xl flex items-center justify-center font-bold text-sm ${
-                          isSelected ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'
-                        }`}>
-                          <Cpu className="w-5 h-5" />
-                        </div>
-                        <div>
-                          <div className="flex items-center space-x-2">
-                            <h5 className="text-sm font-bold text-slate-900">Smart Switch ({dev.gangCount}-Gang)</h5>
-                            <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
-                              Ready
-                            </span>
-                          </div>
-                          <p className="text-xs text-slate-500 mt-0.5">
-                            Device: <span className="font-semibold text-slate-700">{dev.ssid}</span>
-                          </p>
-                          <p className="text-[11px] text-slate-400">
-                            Signal: Strong Wi-Fi • Ready to pair
-                          </p>
-                        </div>
-                      </div>
+              {/* Single discovered device card: Just Device Name with Gang */}
+              <div className="p-4 rounded-2xl border border-blue-600 bg-blue-50/40 shadow-xs flex items-center justify-between">
+                <div className="flex items-center space-x-3.5">
+                  <div className="w-12 h-12 rounded-2xl bg-blue-600 text-white flex items-center justify-center font-bold shadow-xs">
+                    <Power className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h5 className="text-base font-bold text-slate-900">
+                      Smart Switch ({selectedDevice.gangCount}-Gang)
+                    </h5>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Ready to connect
+                    </p>
+                  </div>
+                </div>
 
-                      <div className="flex items-center">
-                        <div className={`w-5 h-5 rounded-full border flex items-center justify-center transition ${
-                          isSelected 
-                            ? 'border-blue-600 bg-blue-600 text-white' 
-                            : 'border-slate-300 bg-white'
-                        }`}>
-                          {isSelected && <Check className="w-3.5 h-3.5 stroke-[3]" />}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
+                <div className="w-6 h-6 rounded-full border border-blue-600 bg-blue-600 text-white flex items-center justify-center">
+                  <Check className="w-4 h-4 stroke-[3]" />
+                </div>
               </div>
 
               <button
@@ -267,7 +222,7 @@ export const AddDeviceModal: React.FC<AddDeviceModalProps> = ({
                 onClick={() => setStep('wifi_credentials')}
                 className="w-full mt-4 py-3.5 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-2xl font-bold text-sm shadow-md shadow-blue-600/25 active:scale-[0.99] transition flex items-center justify-center space-x-2"
               >
-                <span>Connect This Switch</span>
+                <span>Connect Switch</span>
                 <ArrowRight className="w-4 h-4" />
               </button>
             </div>

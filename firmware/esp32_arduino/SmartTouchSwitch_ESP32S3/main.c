@@ -5,6 +5,7 @@
 
 #include "main.h"
 #include "device_config.h"
+#include "mqtt_config.h"
 #include "relay.h"
 #include "schedule_sync.h"
 #include "wifi_mqtt.h"
@@ -32,7 +33,8 @@ void arduino_app_setup(void) {
     arduino_relay_register_cb(on_relay_changed);
 
     arduino_schedule_init();
-    arduino_network_init("MySSID", "MyPass", "mqtt://broker.hivemq.com:1883");
+    // Network & MQTT Broker configured via mqtt_config.h
+    arduino_network_init(CONFIG_WIFI_SSID, CONFIG_WIFI_PASSWORD, CONFIG_MQTT_BROKER_URI);
 }
 
 void arduino_app_loop(void) {

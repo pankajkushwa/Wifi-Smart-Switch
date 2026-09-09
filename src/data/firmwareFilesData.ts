@@ -39,6 +39,67 @@ void app_handle_cloud_command(const char *topic, const char *payload, size_t len
 #endif`
   },
   {
+    path: 'firmware/esp32_idf/mqtt_config.h',
+    name: 'mqtt_config.h',
+    category: 'firmware_idf',
+    language: 'c',
+    description: 'MQTT Broker Details & Wi-Fi Credentials Configuration (EDIT THIS FILE)',
+    content: `/**
+ * @file mqtt_config.h
+ * @brief ESP32-S3 MQTT Broker & Network Configuration Settings
+ *
+ * =========================================================================
+ * HOW TO ENTER YOUR BROKER DETAILS TO COMMUNICATE WITH MQTT:
+ * =========================================================================
+ * 1. Set your Wi-Fi SSID & Password below in CONFIG_WIFI_SSID and CONFIG_WIFI_PASSWORD.
+ * 2. Set your MQTT Broker details in CONFIG_MQTT_BROKER_URI (or HOST & PORT).
+ *    Popular Examples:
+ *      - Public HiveMQ Cloud: "mqtt://broker.hivemq.com:1883"
+ *      - Public EMQX Broker:  "mqtt://broker.emqx.io:1883"
+ *      - Home Assistant / Mosquitto on LAN: "mqtt://192.168.1.100:1883"
+ *      - Secure MQTTS (TLS/SSL): "mqtts://your-broker-domain:8883"
+ * 3. Enter Username & Password if your broker requires authentication (otherwise leave empty "").
+ * 4. Build and flash the firmware using \`idf.py build flash monitor\`.
+ * =========================================================================
+ */
+
+#pragma once
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+/* -------------------------------------------------------------------------
+ * 1. WI-FI STATION CREDENTIALS
+ * ------------------------------------------------------------------------- */
+#define CONFIG_WIFI_SSID             "Home_Fiber_2.4G"
+#define CONFIG_WIFI_PASSWORD         "HomePassword123"
+
+/* -------------------------------------------------------------------------
+ * 2. MQTT BROKER CONNECTION DETAILS
+ * ------------------------------------------------------------------------- */
+#define CONFIG_MQTT_BROKER_URI       "mqtt://broker.hivemq.com:1883"
+#define CONFIG_MQTT_BROKER_HOST      "broker.hivemq.com"
+#define CONFIG_MQTT_BROKER_PORT      1883
+
+/* -------------------------------------------------------------------------
+ * 3. MQTT AUTHENTICATION (Optional - leave empty "" if no auth)
+ * ------------------------------------------------------------------------- */
+#define CONFIG_MQTT_USERNAME         ""
+#define CONFIG_MQTT_PASSWORD         ""
+
+/* -------------------------------------------------------------------------
+ * 4. CLIENT & TOPIC CONFIGURATION
+ * ------------------------------------------------------------------------- */
+#define CONFIG_MQTT_CLIENT_ID        "ESP32S3_SmartSwitch_01"
+#define CONFIG_MQTT_TOPIC_PREFIX     "smartswitch"
+#define CONFIG_MQTT_KEEPALIVE_SEC    60
+
+#ifdef __cplusplus
+}
+#endif`
+  },
+  {
     path: 'firmware/esp32_idf/main.c',
     name: 'main.c',
     category: 'firmware_idf',
@@ -59,6 +120,7 @@ void app_handle_cloud_command(const char *topic, const char *payload, size_t len
 #include "freertos/task.h"
 
 #include "device_config.h"
+#include "mqtt_config.h"
 #include "relay.h"
 #include "schedule_sync.h"
 #include "wifi_mqtt.h"
@@ -121,8 +183,8 @@ void app_init_subsystems(void) {
     /* 4. Offline Schedule Synchronizer */
     schedule_sync_init();
 
-    /* 5. Wi-Fi & MQTT Networking */
-    wifi_mqtt_init("SmartHome_2.4G", "HomePassword123", "mqtt://broker.hivemq.com:1883");
+    /* 5. Wi-Fi & MQTT Networking (Configured via mqtt_config.h) */
+    wifi_mqtt_init(CONFIG_WIFI_SSID, CONFIG_WIFI_PASSWORD, CONFIG_MQTT_BROKER_URI);
     wifi_mqtt_register_cmd_handler(app_handle_cloud_command);
 }
 
@@ -619,16 +681,21 @@ esp_err_t nvs_storage_load_relay_state(uint8_t gang_id, uint8_t *out_state) {
     name: 'device_config.h',
     category: 'firmware_idf',
     language: 'c',
-    description: 'ESP-IDF Factory Manifest Header: Multi-Device Profiles (4-Gang & 2-Gang)',
+    description: 'ESP-IDF Unified Hardware Profile Header: Configurable Single-Device Gang (1, 2, 3, 4, 6, 8, 12, 16)',
     content: `/**
  * @file device_config.h
- * @brief ESP32-S3 Hardware Profile & Device Configuration Definitions
+ * @brief ESP32-S3 Hardware Profile & Configurable Single-Device Gang Architecture
+ * Target: ESP32-S3-WROOM-1-N8R8
+ *
+ * 1 physical device can be set as ANY ONE gang model:
+ * (1, 2, 3, 4, 6, 8, 12, 16, etc.) based on CONFIG_DEVICE_GANG_COUNT or runtime selection.
  */
 
 #pragma once
 
 #include <stdint.h>
 #include <stdbool.h>
+#include "esp_err.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -636,13 +703,20 @@ extern "C" {
 
 #define MAX_GANG_CHANNELS 16
 
+/* Fixed gang count burned when loading code to ESP32 (e.g. 1, 2, 3, 4, 6, 8, 12, 16) */
+#ifndef CONFIG_DEVICE_GANG_COUNT
+#define CONFIG_DEVICE_GANG_COUNT 4
+#endif
+
 typedef enum {
     LOAD_TYPE_LIGHT = 0,
     LOAD_TYPE_FAN,
     LOAD_TYPE_CHANDELIER,
     LOAD_TYPE_SOCKET,
     LOAD_TYPE_AC,
-    LOAD_TYPE_HEATER
+    LOAD_TYPE_HEATER,
+    LOAD_TYPE_DOORBELL,
+    LOAD_TYPE_SWITCH
 } esp_load_type_t;
 
 typedef enum {
@@ -675,9 +749,16 @@ typedef struct {
     const esp_channel_manifest_t *channels;
 } esp_device_manifest_t;
 
+/* Primary Device API */
+esp_err_t device_config_init(void);
+esp_err_t device_config_set_gang_count(uint8_t gang_count);
+uint8_t device_config_get_gang_count(void);
+const esp_device_manifest_t* device_config_get_active_profile(void);
+
+/* Helper / Compatibility functions */
+const esp_device_manifest_t* device_config_get_profile(uint8_t gang_count);
 const esp_device_manifest_t* device_config_get_profile_4gang(void);
 const esp_device_manifest_t* device_config_get_profile_2gang(void);
-const esp_device_manifest_t* device_config_get_active_profile(void);
 
 #ifdef __cplusplus
 }
@@ -688,47 +769,103 @@ const esp_device_manifest_t* device_config_get_active_profile(void);
     name: 'device_config.c',
     category: 'firmware_idf',
     language: 'c',
-    description: 'ESP-IDF Factory Manifest Implementation (DEV001 4-Gang & DEV002 2-Gang)',
+    description: 'ESP-IDF Configurable Single-Device Implementation (Set to 1, 2, 3, 4, 6, 8, 12, 16 Gangs)',
     content: `/**
  * @file device_config.c
  * @brief ESP32-S3 Hardware Profile Implementations
+ *
+ * Configurable Single-Device Architecture:
+ * 1 physical device can be set as any 1 gang: 1, 2, 3, 4, 6, 8, 12, 16, etc.
  */
 
 #include "device_config.h"
+#include <stdio.h>
+#include <string.h>
+#include "esp_log.h"
 
-/* Profile 1: 4-Gang Touch Switch (Living Room / Master DEV001) */
-static const esp_channel_manifest_t s_channels_4gang[4] = {
-    { .gang_id = 1, .gpio_pin = 4, .load_type = LOAD_TYPE_CHANDELIER, .factory_name = "Main Chandelier",   .active_level = RELAY_ACTIVE_HIGH, .allowed_mode = RELAY_MODE_LATCHING, .pulse_duration_ms = 0, .is_factory_locked = true },
-    { .gang_id = 2, .gpio_pin = 5, .load_type = LOAD_TYPE_FAN,        .factory_name = "Ceiling Fan",       .active_level = RELAY_ACTIVE_HIGH, .allowed_mode = RELAY_MODE_LATCHING, .pulse_duration_ms = 0, .is_factory_locked = true },
-    { .gang_id = 3, .gpio_pin = 6, .load_type = LOAD_TYPE_LIGHT,      .factory_name = "Ambient Downlights",.active_level = RELAY_ACTIVE_HIGH, .allowed_mode = RELAY_MODE_LATCHING, .pulse_duration_ms = 0, .is_factory_locked = true },
-    { .gang_id = 4, .gpio_pin = 7, .load_type = LOAD_TYPE_LIGHT,      .factory_name = "Balcony Strip Light",.active_level = RELAY_ACTIVE_HIGH, .allowed_mode = RELAY_MODE_LATCHING, .pulse_duration_ms = 0, .is_factory_locked = true }
+static const char *TAG = "DEVICE_CFG";
+
+/* Master channel definition table for up to 16 hardware gangs on ESP32-S3 */
+static const esp_channel_manifest_t s_master_channel_table[MAX_GANG_CHANNELS] = {
+    { .gang_id = 1,  .gpio_pin = 4,  .load_type = LOAD_TYPE_CHANDELIER, .factory_name = "Main Chandelier",     .active_level = RELAY_ACTIVE_HIGH, .allowed_mode = RELAY_MODE_LATCHING, .pulse_duration_ms = 0,    .is_factory_locked = true },
+    { .gang_id = 2,  .gpio_pin = 5,  .load_type = LOAD_TYPE_FAN,        .factory_name = "Ceiling Fan",         .active_level = RELAY_ACTIVE_HIGH, .allowed_mode = RELAY_MODE_LATCHING, .pulse_duration_ms = 0,    .is_factory_locked = true },
+    { .gang_id = 3,  .gpio_pin = 6,  .load_type = LOAD_TYPE_DOORBELL,   .factory_name = "Front Door Bell",     .active_level = RELAY_ACTIVE_HIGH, .allowed_mode = RELAY_MODE_PULSE,    .pulse_duration_ms = 500,  .is_factory_locked = true },
+    { .gang_id = 4,  .gpio_pin = 7,  .load_type = LOAD_TYPE_LIGHT,      .factory_name = "Balcony Accent Light",.active_level = RELAY_ACTIVE_HIGH, .allowed_mode = RELAY_MODE_LATCHING, .pulse_duration_ms = 0,    .is_factory_locked = true },
+    { .gang_id = 5,  .gpio_pin = 8,  .load_type = LOAD_TYPE_SOCKET,     .factory_name = "Media Console Socket",.active_level = RELAY_ACTIVE_HIGH, .allowed_mode = RELAY_MODE_LATCHING, .pulse_duration_ms = 0,    .is_factory_locked = true },
+    { .gang_id = 6,  .gpio_pin = 9,  .load_type = LOAD_TYPE_FAN,        .factory_name = "Exhaust Booster",     .active_level = RELAY_ACTIVE_HIGH, .allowed_mode = RELAY_MODE_LATCHING, .pulse_duration_ms = 0,    .is_factory_locked = true },
+    { .gang_id = 7,  .gpio_pin = 10, .load_type = LOAD_TYPE_AC,         .factory_name = "Air Conditioner",     .active_level = RELAY_ACTIVE_HIGH, .allowed_mode = RELAY_MODE_LATCHING, .pulse_duration_ms = 0,    .is_factory_locked = true },
+    { .gang_id = 8,  .gpio_pin = 11, .load_type = LOAD_TYPE_HEATER,     .factory_name = "Water Geyser",        .active_level = RELAY_ACTIVE_HIGH, .allowed_mode = RELAY_MODE_LATCHING, .pulse_duration_ms = 0,    .is_factory_locked = true },
+    { .gang_id = 9,  .gpio_pin = 12, .load_type = LOAD_TYPE_LIGHT,      .factory_name = "Auxiliary Light 9",   .active_level = RELAY_ACTIVE_HIGH, .allowed_mode = RELAY_MODE_LATCHING, .pulse_duration_ms = 0,    .is_factory_locked = true },
+    { .gang_id = 10, .gpio_pin = 13, .load_type = LOAD_TYPE_LIGHT,      .factory_name = "Terrace Spotlight",   .active_level = RELAY_ACTIVE_HIGH, .allowed_mode = RELAY_MODE_LATCHING, .pulse_duration_ms = 0,    .is_factory_locked = true },
+    { .gang_id = 11, .gpio_pin = 14, .load_type = LOAD_TYPE_LIGHT,      .factory_name = "Cove LED Driver",     .active_level = RELAY_ACTIVE_HIGH, .allowed_mode = RELAY_MODE_LATCHING, .pulse_duration_ms = 0,    .is_factory_locked = true },
+    { .gang_id = 12, .gpio_pin = 15, .load_type = LOAD_TYPE_SOCKET,     .factory_name = "Garden Valve Socket", .active_level = RELAY_ACTIVE_HIGH, .allowed_mode = RELAY_MODE_PULSE,    .pulse_duration_ms = 3000, .is_factory_locked = true },
+    { .gang_id = 13, .gpio_pin = 16, .load_type = LOAD_TYPE_SOCKET,     .factory_name = "Gate Solenoid",       .active_level = RELAY_ACTIVE_HIGH, .allowed_mode = RELAY_MODE_PULSE,    .pulse_duration_ms = 500,  .is_factory_locked = true },
+    { .gang_id = 14, .gpio_pin = 17, .load_type = LOAD_TYPE_LIGHT,      .factory_name = "Security Floodlight", .active_level = RELAY_ACTIVE_HIGH, .allowed_mode = RELAY_MODE_LATCHING, .pulse_duration_ms = 0,    .is_factory_locked = true },
+    { .gang_id = 15, .gpio_pin = 18, .load_type = LOAD_TYPE_LIGHT,      .factory_name = "Night Pathway Light", .active_level = RELAY_ACTIVE_HIGH, .allowed_mode = RELAY_MODE_LATCHING, .pulse_duration_ms = 0,    .is_factory_locked = true },
+    { .gang_id = 16, .gpio_pin = 21, .load_type = LOAD_TYPE_FAN,        .factory_name = "Master Exhaust Fan",  .active_level = RELAY_ACTIVE_HIGH, .allowed_mode = RELAY_MODE_LATCHING, .pulse_duration_ms = 0,    .is_factory_locked = true },
 };
 
-static const esp_device_manifest_t s_device_4gang = {
-    .serial_no = "SN:ESP32S3-4G-2026-X883B",
-    .model_id = "LUMIERE-S3-4G-TOUCH",
-    .hardware_rev = "v2.4-SMD",
-    .hardware_gang_count = 4,
-    .channels = s_channels_4gang
-};
+/* Single active device manifest instance */
+static esp_device_manifest_t s_active_device;
+static esp_channel_manifest_t s_active_channels[MAX_GANG_CHANNELS];
+static bool s_is_initialized = false;
 
-/* Profile 2: 2-Gang Touch Switch (Bedroom DEV002) */
-static const esp_channel_manifest_t s_channels_2gang[2] = {
-    { .gang_id = 1, .gpio_pin = 4, .load_type = LOAD_TYPE_LIGHT, .factory_name = "Bedside Lamp", .active_level = RELAY_ACTIVE_HIGH, .allowed_mode = RELAY_MODE_LATCHING, .pulse_duration_ms = 0, .is_factory_locked = true },
-    { .gang_id = 2, .gpio_pin = 5, .load_type = LOAD_TYPE_FAN,   .factory_name = "Quiet Fan",    .active_level = RELAY_ACTIVE_HIGH, .allowed_mode = RELAY_MODE_LATCHING, .pulse_duration_ms = 0, .is_factory_locked = true }
-};
+esp_err_t device_config_set_gang_count(uint8_t gang_count) {
+    if (gang_count < 1 || gang_count > MAX_GANG_CHANNELS) {
+        ESP_LOGE(TAG, "Invalid gang count: %d (supported: 1 to %d)", gang_count, MAX_GANG_CHANNELS);
+        return ESP_ERR_INVALID_ARG;
+    }
 
-static const esp_device_manifest_t s_device_2gang = {
-    .serial_no = "SN:ESP32S3-2G-2026-Y412A",
-    .model_id = "LUMIERE-S3-2G-TOUCH",
-    .hardware_rev = "v2.4-SMD",
-    .hardware_gang_count = 2,
-    .channels = s_channels_2gang
-};
+    s_active_device.hardware_gang_count = gang_count;
+    snprintf(s_active_device.model_id, sizeof(s_active_device.model_id), "LUMIERE-S3-%dG-TOUCH", gang_count);
+    snprintf(s_active_device.serial_no, sizeof(s_active_device.serial_no), "SN:ESP32S3-%dG-2026-X%04X", gang_count, gang_count * 1111);
+    strncpy(s_active_device.hardware_rev, "v2.4-SMD", sizeof(s_active_device.hardware_rev));
 
-const esp_device_manifest_t* device_config_get_profile_4gang(void) { return &s_device_4gang; }
-const esp_device_manifest_t* device_config_get_profile_2gang(void) { return &s_device_2gang; }
-const esp_device_manifest_t* device_config_get_active_profile(void) { return &s_device_4gang; }`
+    /* Populate the active channels for this single device */
+    for (uint8_t i = 0; i < gang_count; i++) {
+        s_active_channels[i] = s_master_channel_table[i];
+    }
+    s_active_device.channels = s_active_channels;
+    s_is_initialized = true;
+
+    ESP_LOGI(TAG, "Device configured as %d-Gang Switch (Model: %s, SN: %s)",
+             gang_count, s_active_device.model_id, s_active_device.serial_no);
+    return ESP_OK;
+}
+
+esp_err_t device_config_init(void) {
+    if (!s_is_initialized) {
+        return device_config_set_gang_count(CONFIG_DEVICE_GANG_COUNT);
+    }
+    return ESP_OK;
+}
+
+uint8_t device_config_get_gang_count(void) {
+    if (!s_is_initialized) {
+        device_config_init();
+    }
+    return s_active_device.hardware_gang_count;
+}
+
+const esp_device_manifest_t* device_config_get_active_profile(void) {
+    if (!s_is_initialized) {
+        device_config_init();
+    }
+    return &s_active_device;
+}
+
+const esp_device_manifest_t* device_config_get_profile(uint8_t gang_count) {
+    device_config_set_gang_count(gang_count);
+    return &s_active_device;
+}
+
+const esp_device_manifest_t* device_config_get_profile_4gang(void) {
+    return device_config_get_profile(4);
+}
+
+const esp_device_manifest_t* device_config_get_profile_2gang(void) {
+    return device_config_get_profile(2);
+}`
   },
   {
     path: 'firmware/esp32_idf/CMakeLists.txt',
@@ -776,6 +913,53 @@ void arduino_app_handle_cmd(const char *cmd_str);
 #endif`
   },
   {
+    path: 'firmware/esp32_arduino/mqtt_config.h',
+    name: 'mqtt_config.h',
+    category: 'firmware_arduino',
+    language: 'c',
+    description: 'Arduino ESP32 MQTT Broker & Wi-Fi Configuration Settings (EDIT THIS FILE)',
+    content: `/**
+ * @file mqtt_config.h
+ * @brief Arduino ESP32 MQTT Broker & Wi-Fi Configuration Settings
+ *
+ * =========================================================================
+ * HOW TO ENTER YOUR BROKER DETAILS TO COMMUNICATE WITH MQTT:
+ * =========================================================================
+ * Edit the definitions below to connect to your Wi-Fi and MQTT broker:
+ *   - HiveMQ Public:      "mqtt://broker.hivemq.com:1883"
+ *   - EMQX Public:        "mqtt://broker.emqx.io:1883"
+ *   - Home Assistant LAN: "mqtt://192.168.1.100:1883" (or your local IP)
+ * =========================================================================
+ */
+
+#pragma once
+
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+// Wi-Fi Station Credentials
+#define CONFIG_WIFI_SSID            "Home_Fiber_2.4G"
+#define CONFIG_WIFI_PASSWORD        "HomePassword123"
+
+// MQTT Broker URI & Connection
+#define CONFIG_MQTT_BROKER_URI      "mqtt://broker.hivemq.com:1883"
+#define CONFIG_MQTT_BROKER_HOST     "broker.hivemq.com"
+#define CONFIG_MQTT_BROKER_PORT     1883
+
+// Optional Broker Authentication (leave empty "" if no auth required)
+#define CONFIG_MQTT_USERNAME        ""
+#define CONFIG_MQTT_PASSWORD        ""
+
+// Client Identifier & Topic Prefix
+#define CONFIG_MQTT_CLIENT_ID       "ESP32S3_SmartSwitch_01"
+#define CONFIG_MQTT_TOPIC_PREFIX    "smartswitch"
+
+#ifdef __cplusplus
+}
+#endif`
+  },
+  {
     path: 'firmware/esp32_arduino/main.c',
     name: 'main.c',
     category: 'firmware_arduino',
@@ -788,6 +972,7 @@ void arduino_app_handle_cmd(const char *cmd_str);
 
 #include "main.h"
 #include "device_config.h"
+#include "mqtt_config.h"
 #include "relay.h"
 #include "schedule_sync.h"
 #include "wifi_mqtt.h"
@@ -812,7 +997,8 @@ void arduino_app_setup(void) {
     arduino_relay_init(s_prof);
     arduino_relay_register_cb(on_relay_changed);
     arduino_schedule_init();
-    arduino_network_init("MySSID", "MyPass", "mqtt://broker.hivemq.com:1883");
+    // Network & MQTT Broker configured via mqtt_config.h
+    arduino_network_init(CONFIG_WIFI_SSID, CONFIG_WIFI_PASSWORD, CONFIG_MQTT_BROKER_URI);
 }
 
 void arduino_app_loop(void) {
@@ -1153,10 +1339,13 @@ bool arduino_nvs_load_state(uint8_t gang_id, bool *out_state) {
     name: 'device_config.h',
     category: 'firmware_arduino',
     language: 'c',
-    description: 'Arduino Device Profiles & Multi-Device Manifest Header',
+    description: 'Arduino Device Profiles & Configurable Single-Device Gang Architecture (1, 2, 3, 4, 6, 8, 12, 16)',
     content: `/**
  * @file device_config.h
  * @brief ESP32-S3 Hardware Profile Definitions for Arduino Core
+ *
+ * Configurable Single-Device Architecture:
+ * 1 physical device can be set as any 1 gang: 1, 2, 3, 4, 6, 8, 12, 16, etc.
  */
 
 #pragma once
@@ -1169,6 +1358,11 @@ extern "C" {
 #endif
 
 #define MAX_GANGS 16
+
+/* Default gang count for this physical unit (set to 1, 2, 3, 4, 6, 8, 12, 16, etc.) */
+#ifndef CONFIG_DEVICE_GANG_COUNT
+#define CONFIG_DEVICE_GANG_COUNT 4
+#endif
 
 typedef enum {
     LOAD_LIGHT = 0,
@@ -1194,9 +1388,15 @@ typedef struct {
     const channel_profile_t *channels;
 } switch_device_profile_t;
 
+/* Primary Device API */
+bool set_device_gang_count(uint8_t gang_count);
+uint8_t get_device_gang_count(void);
+const switch_device_profile_t* get_active_device_profile(void);
+
+/* Helper / Compatibility functions */
+const switch_device_profile_t* get_device_profile(uint8_t gang_count);
 const switch_device_profile_t* get_device_profile_4gang(void);
 const switch_device_profile_t* get_device_profile_2gang(void);
-const switch_device_profile_t* get_active_device_profile(void);
 
 #ifdef __cplusplus
 }
@@ -1207,31 +1407,89 @@ const switch_device_profile_t* get_active_device_profile(void);
     name: 'device_config.c',
     category: 'firmware_arduino',
     language: 'c',
-    description: 'Arduino Device Profiles Implementation (4-Gang & 2-Gang)',
+    description: 'Arduino Configurable Single-Device Implementation (Set to 1, 2, 3, 4, 6, 8, 12, 16 Gangs)',
     content: `/**
  * @file device_config.c
  * @brief ESP32-S3 Hardware Profile Implementations for Arduino Core
+ *
+ * Configurable Single-Device Architecture:
+ * 1 physical device can be set as any 1 gang: 1, 2, 3, 4, 6, 8, 12, 16, etc.
  */
 
 #include "device_config.h"
+#include <stdio.h>
+#include <string.h>
 
-static const channel_profile_t s_channels_4g[4] = {
-    { .gang_id = 1, .gpio_pin = 4, .load_type = LOAD_CHANDELIER, .name = "Main Chandelier",   .active_high = true },
-    { .gang_id = 2, .gpio_pin = 5, .load_type = LOAD_FAN,        .name = "Ceiling Fan",       .active_high = true },
-    { .gang_id = 3, .gpio_pin = 6, .load_type = LOAD_LIGHT,      .name = "Ambient Downlights",.active_high = true },
-    { .gang_id = 4, .gpio_pin = 7, .load_type = LOAD_LIGHT,      .name = "Balcony Strip Light",.active_high = true }
+/* Master channel definition table for up to 16 hardware gangs on ESP32-S3 */
+static const channel_profile_t s_master_channels[MAX_GANGS] = {
+    { .gang_id = 1,  .gpio_pin = 4,  .load_type = LOAD_CHANDELIER, .name = "Main Chandelier",     .active_high = true },
+    { .gang_id = 2,  .gpio_pin = 5,  .load_type = LOAD_FAN,        .name = "Ceiling Fan",         .active_high = true },
+    { .gang_id = 3,  .gpio_pin = 6,  .load_type = LOAD_LIGHT,      .name = "Ambient Downlights",  .active_high = true },
+    { .gang_id = 4,  .gpio_pin = 7,  .load_type = LOAD_LIGHT,      .name = "Balcony Accent Light",.active_high = true },
+    { .gang_id = 5,  .gpio_pin = 8,  .load_type = LOAD_SOCKET,     .name = "Media Console Socket",.active_high = true },
+    { .gang_id = 6,  .gpio_pin = 9,  .load_type = LOAD_FAN,        .name = "Exhaust Booster",     .active_high = true },
+    { .gang_id = 7,  .gpio_pin = 10, .load_type = LOAD_AC,         .name = "Air Conditioner",     .active_high = true },
+    { .gang_id = 8,  .gpio_pin = 11, .load_type = LOAD_HEATER,     .name = "Water Geyser",        .active_high = true },
+    { .gang_id = 9,  .gpio_pin = 12, .load_type = LOAD_LIGHT,      .name = "Auxiliary Light 9",   .active_high = true },
+    { .gang_id = 10, .gpio_pin = 13, .load_type = LOAD_LIGHT,      .name = "Terrace Spotlight",   .active_high = true },
+    { .gang_id = 11, .gpio_pin = 14, .load_type = LOAD_LIGHT,      .name = "Cove LED Driver",     .active_high = true },
+    { .gang_id = 12, .gpio_pin = 15, .load_type = LOAD_SOCKET,     .name = "Garden Valve Socket", .active_high = true },
+    { .gang_id = 13, .gpio_pin = 16, .load_type = LOAD_SOCKET,     .name = "Gate Solenoid",       .active_high = true },
+    { .gang_id = 14, .gpio_pin = 17, .load_type = LOAD_LIGHT,      .name = "Security Floodlight", .active_high = true },
+    { .gang_id = 15, .gpio_pin = 18, .load_type = LOAD_LIGHT,      .name = "Night Pathway Light", .active_high = true },
+    { .gang_id = 16, .gpio_pin = 21, .load_type = LOAD_FAN,        .name = "Master Exhaust Fan",  .active_high = true },
 };
 
-static const switch_device_profile_t s_profile_4g = {
-    .serial_no = "SN:ESP32S3-4G-2026-X883B",
-    .model_id = "LUMIERE-S3-4G-TOUCH",
-    .gang_count = 4,
-    .channels = s_channels_4g
-};
+/* Single active device manifest instance */
+static switch_device_profile_t s_device_profile;
+static channel_profile_t s_active_channels[MAX_GANGS];
+static bool s_is_init = false;
 
-const switch_device_profile_t* get_device_profile_4gang(void) { return &s_profile_4g; }
-const switch_device_profile_t* get_device_profile_2gang(void) { return &s_profile_4g; }
-const switch_device_profile_t* get_active_device_profile(void) { return &s_profile_4g; }`
+bool set_device_gang_count(uint8_t gang_count) {
+    if (gang_count < 1 || gang_count > MAX_GANGS) {
+        return false;
+    }
+
+    s_device_profile.gang_count = gang_count;
+    snprintf(s_device_profile.model_id, sizeof(s_device_profile.model_id), "LUMIERE-S3-%dG-TOUCH", gang_count);
+    snprintf(s_device_profile.serial_no, sizeof(s_device_profile.serial_no), "SN:ESP32S3-%dG-2026-X%04X", gang_count, gang_count * 1111);
+
+    for (uint8_t i = 0; i < gang_count; i++) {
+        s_active_channels[i] = s_master_channels[i];
+    }
+    s_device_profile.channels = s_active_channels;
+    s_is_init = true;
+    return true;
+}
+
+static void ensure_init(void) {
+    if (!s_is_init) {
+        set_device_gang_count(CONFIG_DEVICE_GANG_COUNT);
+    }
+}
+
+uint8_t get_device_gang_count(void) {
+    ensure_init();
+    return s_device_profile.gang_count;
+}
+
+const switch_device_profile_t* get_active_device_profile(void) {
+    ensure_init();
+    return &s_device_profile;
+}
+
+const switch_device_profile_t* get_device_profile(uint8_t gang_count) {
+    set_device_gang_count(gang_count);
+    return &s_device_profile;
+}
+
+const switch_device_profile_t* get_device_profile_4gang(void) {
+    return get_device_profile(4);
+}
+
+const switch_device_profile_t* get_device_profile_2gang(void) {
+    return get_device_profile(2);
+}`
   },
   {
     path: 'firmware/esp32_arduino/SmartTouchSwitch_ESP32S3.ino',

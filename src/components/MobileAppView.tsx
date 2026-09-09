@@ -29,12 +29,18 @@ import {
   MapPin,
   Layers,
   FolderPlus,
-  Calendar
+  Calendar,
+  Radio,
+  FileCode,
+  Copy,
+  ExternalLink,
+  Cpu,
+  Bell
 } from 'lucide-react';
 import { RelayChannelConfig, GangCount, RelayState } from '../types/firmware';
 import { ESP_FACTORY_PROFILES } from '../data/espFactoryProfiles';
 import { BuildingRoomModal, Building, Room } from './BuildingRoomModal';
-import { MultiDeviceScheduler } from './MultiDeviceScheduler';
+import { MobileTimerSection } from './MobileTimerSection';
 
 interface MobileAppViewProps {
   gangCount: GangCount;
@@ -94,12 +100,22 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
   // Building & Room management modal state
   const [isBuildingModalOpen, setIsBuildingModalOpen] = useState(false);
   const [buildingModalTab, setBuildingModalTab] = useState<'buildings' | 'rooms'>('buildings');
-  const [isSwitchRoomPickerOpen, setIsSwitchRoomPickerOpen] = useState(false);
   
   // Consumer switch countdown timers state: channelId -> remaining seconds
   const [activeTimers, setActiveTimers] = useState<Record<number, number>>({});
   const [timerModalChannelId, setTimerModalChannelId] = useState<number | null>(null);
-  const [timerSubTab, setTimerSubTab] = useState<'multi_schedule' | 'countdowns'>('multi_schedule');
+
+  // MQTT Broker Configuration State
+  const [isMqttModalOpen, setIsMqttModalOpen] = useState(false);
+  const [isEsp32CodeModalOpen, setIsEsp32CodeModalOpen] = useState(false);
+  const [mqttBrokerUri, setMqttBrokerUri] = useState('mqtt://broker.hivemq.com:1883');
+  const [mqttBrokerHost, setMqttBrokerHost] = useState('broker.hivemq.com');
+  const [mqttBrokerPort, setMqttBrokerPort] = useState('1883');
+  const [mqttUsername, setMqttUsername] = useState('');
+  const [mqttPassword, setMqttPassword] = useState('');
+  const [mqttTopicPrefix, setMqttTopicPrefix] = useState('smartswitch');
+  const [mqttTestStatus, setMqttTestStatus] = useState<'idle' | 'testing' | 'success'>('idle');
+  const [copiedSnippet, setCopiedSnippet] = useState(false);
 
   // Settings preferences
   const [nightLightEnabled, setNightLightEnabled] = useState(true);
@@ -217,6 +233,10 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
         return <Sparkles className={`w-5 h-5 ${isOn ? 'text-amber-500' : 'text-slate-400'}`} />;
       case 'ac': 
         return <Wind className={`w-5 h-5 ${isOn ? 'text-blue-600' : 'text-slate-400'}`} />;
+      case 'doorbell': 
+        return <Bell className={`w-5 h-5 transition-transform ${isOn ? 'text-amber-500 animate-bounce' : 'text-slate-400'}`} />;
+      case 'switch': 
+        return <Power className={`w-5 h-5 ${isOn ? 'text-blue-600' : 'text-slate-400'}`} />;
       default: 
         return <Lightbulb className={`w-5 h-5 ${isOn ? 'text-amber-500' : 'text-slate-400'}`} />;
     }
@@ -353,93 +373,6 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
         {/* TAB 1: HOME TAB */}
         {activeTab === 'home' && (
           <>
-            {/* Device Overview Card */}
-            <div className="bg-white rounded-3xl p-4 shadow-sm border border-slate-100">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                    <span className="text-xs font-semibold text-emerald-600">Online</span>
-                    <span className="text-slate-300 text-xs">•</span>
-                    
-                    {/* Room Badge / Switcher */}
-                    <div className="relative inline-block">
-                      <button
-                        onClick={() => setIsSwitchRoomPickerOpen(!isSwitchRoomPickerOpen)}
-                        className="text-[11px] text-blue-700 bg-blue-50 hover:bg-blue-100 px-2.5 py-0.5 rounded-full font-bold flex items-center space-x-1 transition border border-blue-200"
-                        title="Change Room Assignment"
-                      >
-                        <MapPin className="w-3 h-3 text-blue-600" />
-                        <span>Room: {switchRoom}</span>
-                        <ChevronDown className="w-2.5 h-2.5" />
-                      </button>
-
-                      {/* Dropdown room selector */}
-                      {isSwitchRoomPickerOpen && (
-                        <div className="absolute left-0 mt-1 w-44 bg-white rounded-2xl shadow-xl border border-slate-200 p-1.5 z-30 animate-in fade-in">
-                          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 py-1">
-                            Assign to Room:
-                          </p>
-                          {activeBuildingRooms.map(r => (
-                            <button
-                              key={r.id}
-                              onClick={() => {
-                                setSwitchRoom(r.name);
-                                setIsSwitchRoomPickerOpen(false);
-                              }}
-                              className={`w-full text-left px-2.5 py-1.5 rounded-xl text-xs flex items-center justify-between ${
-                                switchRoom === r.name ? 'bg-blue-50 text-blue-600 font-bold' : 'text-slate-700 hover:bg-slate-50'
-                              }`}
-                            >
-                              <span>{r.name}</span>
-                              {switchRoom === r.name && <Check className="w-3.5 h-3.5 text-blue-600" />}
-                            </button>
-                          ))}
-                          <div className="border-t border-slate-100 mt-1 pt-1">
-                            <button
-                              onClick={() => {
-                                setIsSwitchRoomPickerOpen(false);
-                                setBuildingModalTab('rooms');
-                                setIsBuildingModalOpen(true);
-                              }}
-                              className="w-full text-left px-2 py-1 text-[11px] text-blue-600 font-bold hover:underline flex items-center space-x-1"
-                            >
-                              <Plus className="w-3 h-3" />
-                              <span>+ Create New Room</span>
-                            </button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <h3 className="text-lg font-extrabold text-slate-900 mt-0.5">{friendlySwitchName}</h3>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {activeCount === 0 
-                      ? 'All switches are currently turned off' 
-                      : `${activeCount} of ${gangCount} switches are turned on`}
-                  </p>
-                </div>
-
-                {/* Master Quick Controls */}
-                <div className="flex items-center space-x-2">
-                  <button
-                    id="master-all-off-btn"
-                    onClick={() => onSetAll(0)}
-                    className="px-3 py-1.5 rounded-xl border border-slate-200 hover:bg-slate-50 text-xs font-semibold text-slate-600 active:scale-95 transition"
-                  >
-                    All Off
-                  </button>
-                  <button
-                    id="master-all-on-btn"
-                    onClick={() => onSetAll(1)}
-                    className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold shadow-sm shadow-blue-500/20 active:scale-95 transition"
-                  >
-                    All On
-                  </button>
-                </div>
-              </div>
-            </div>
-
             {/* If selected room has no switches */}
             {selectedRoom !== 'All' && selectedRoom !== switchRoom ? (
               <div className="bg-white rounded-3xl p-6 text-center border border-slate-200/80 shadow-xs space-y-3 my-2">
@@ -534,19 +467,34 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
 
                       {/* Bottom Controls: User Toggle & Timer Button */}
                       <div className="space-y-2 pt-2 border-t border-slate-100">
-                        {/* Main Clean Power Button */}
-                        <button
-                          id={`user-toggle-btn-${channel.id}`}
-                          onClick={() => onToggle(channel.id)}
-                          className={`w-full py-2.5 px-3 rounded-2xl font-bold text-xs transition-all flex items-center justify-center space-x-1.5 active:scale-[0.98] ${
-                            isOn 
-                              ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-500/20' 
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                          }`}
-                        >
-                          <Power className={`w-3.5 h-3.5 ${isOn ? 'text-white' : 'text-slate-400'}`} />
-                          <span>{isOn ? 'Turn Off' : 'Turn On'}</span>
-                        </button>
+                        {/* Main Clean Power / Chime Button */}
+                        {channel.icon === 'doorbell' ? (
+                          <button
+                            id={`user-toggle-btn-${channel.id}`}
+                            onClick={() => onPulse(channel.id, channel.pulseDurationMs || 600)}
+                            className={`w-full py-2.5 px-3 rounded-2xl font-bold text-xs transition-all flex items-center justify-center space-x-1.5 active:scale-[0.98] ${
+                              isOn 
+                                ? 'bg-amber-500 hover:bg-amber-400 text-white shadow-md shadow-amber-500/25' 
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                            }`}
+                          >
+                            <Bell className={`w-3.5 h-3.5 ${isOn ? 'text-white animate-bounce' : 'text-slate-400'}`} />
+                            <span>{isOn ? 'Ringing...' : 'Ring Door Bell'}</span>
+                          </button>
+                        ) : (
+                          <button
+                            id={`user-toggle-btn-${channel.id}`}
+                            onClick={() => onToggle(channel.id)}
+                            className={`w-full py-2.5 px-3 rounded-2xl font-bold text-xs transition-all flex items-center justify-center space-x-1.5 active:scale-[0.98] ${
+                              isOn 
+                                ? 'bg-blue-600 hover:bg-blue-500 text-white shadow-md shadow-blue-500/20' 
+                                : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
+                            }`}
+                          >
+                            <Power className={`w-3.5 h-3.5 ${isOn ? 'text-white' : 'text-slate-400'}`} />
+                            <span>{isOn ? 'Turn Off' : 'Turn On'}</span>
+                          </button>
+                        )}
 
                         {/* Quick Timer / Countdown Shortcut */}
                         <button
@@ -677,85 +625,15 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
 
         {/* TAB 3: TIMER / SCHEDULE TAB */}
         {activeTab === 'timer' && (
-          <div className="space-y-4">
-            {/* Sub-tab Switcher: Multi-Device Scheduling vs Channel Countdowns */}
-            <div className="flex bg-slate-200/70 p-1 rounded-2xl text-xs font-bold">
-              <button
-                onClick={() => setTimerSubTab('multi_schedule')}
-                className={`flex-1 py-2 rounded-xl transition flex items-center justify-center space-x-1.5 ${
-                  timerSubTab === 'multi_schedule' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Calendar className="w-3.5 h-3.5" />
-                <span>Multi-Device Schedules</span>
-              </button>
-              <button
-                onClick={() => setTimerSubTab('countdowns')}
-                className={`flex-1 py-2 rounded-xl transition flex items-center justify-center space-x-1.5 ${
-                  timerSubTab === 'countdowns' ? 'bg-white text-blue-600 shadow-xs' : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Timer className="w-3.5 h-3.5" />
-                <span>Single Switch Timers</span>
-              </button>
-            </div>
-
-            {timerSubTab === 'multi_schedule' ? (
-              <MultiDeviceScheduler 
-                currentBuildingId={activeBuildingId}
-                onApplyChannelState={(relay, state) => {
-                  const ch = channels.find(c => c.id === relay);
-                  if (ch && ch.state !== state) {
-                    onToggle(relay);
-                  }
-                }}
-              />
-            ) : (
-              <div className="space-y-3">
-                <div className="bg-white rounded-3xl p-5 shadow-xs border border-slate-100">
-                  <h3 className="text-base font-bold text-slate-900">Switch Countdown Timers</h3>
-                  <p className="text-xs text-slate-500 mt-1">
-                    Set a quick auto-turn-off countdown for individual switch channels in this room.
-                  </p>
-                </div>
-
-                <div className="space-y-2.5">
-                  {activeChannels.map(ch => {
-                    const hasTimer = activeTimers[ch.id] !== undefined;
-                    return (
-                      <div key={ch.id} className="bg-white p-4 rounded-3xl border border-slate-100 shadow-xs flex items-center justify-between">
-                        <div className="flex items-center space-x-3">
-                          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${ch.state === 1 ? 'bg-amber-50 text-amber-600' : 'bg-slate-100 text-slate-400'}`}>
-                            {getIcon(ch.icon, ch.state)}
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-bold text-slate-800">{ch.name}</h4>
-                            <p className="text-xs text-slate-500">
-                              {hasTimer ? (
-                                <span className="text-amber-600 font-semibold">Turning off in {formatTimer(activeTimers[ch.id])}</span>
-                              ) : (
-                                'No active timer'
-                              )}
-                            </p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => setTimerModalChannelId(ch.id)}
-                          className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition ${
-                            hasTimer 
-                              ? 'bg-amber-50 text-amber-700 border border-amber-300' 
-                              : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                          }`}
-                        >
-                          {hasTimer ? 'Edit' : 'Set Timer'}
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-          </div>
+          <MobileTimerSection
+            channels={channels}
+            gangCount={gangCount}
+            onToggle={onToggle}
+            activeTimers={activeTimers}
+            onSetTimer={handleSetTimer}
+            formatTimer={formatTimer}
+            roomName={switchRoom}
+          />
         )}
 
         {/* TAB 4: SETTINGS / ME TAB */}
@@ -884,6 +762,52 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
               </div>
             </div>
 
+            {/* MQTT Broker Connection & ESP32 Configuration Card */}
+            <div className="bg-white rounded-3xl p-4 shadow-xs border border-slate-100 space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Radio className="w-4 h-4 text-blue-600" />
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-slate-700">
+                    MQTT Broker Connection
+                  </h4>
+                </div>
+                <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 flex items-center space-x-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+                  <span>Online</span>
+                </span>
+              </div>
+
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-100 text-xs space-y-1.5 font-mono">
+                <div className="flex items-center justify-between text-slate-600">
+                  <span className="text-slate-400 font-sans">Broker URI:</span>
+                  <span className="font-bold text-slate-900 truncate max-w-[190px]">{mqttBrokerUri}</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-600">
+                  <span className="text-slate-400 font-sans">Base Topic:</span>
+                  <span className="font-bold text-blue-600">{mqttTopicPrefix}/</span>
+                </div>
+                <div className="flex items-center justify-between text-slate-600">
+                  <span className="text-slate-400 font-sans">Firmware Config:</span>
+                  <span className="font-bold text-slate-700 font-mono">mqtt_config.h</span>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                <button
+                  onClick={() => setIsMqttModalOpen(true)}
+                  className="py-2 px-2.5 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs shadow-xs transition text-center"
+                >
+                  Configure Broker
+                </button>
+                <button
+                  onClick={() => setIsEsp32CodeModalOpen(true)}
+                  className="py-2 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition text-center"
+                >
+                  ESP32 Code Details
+                </button>
+              </div>
+            </div>
+
             {/* Device Info */}
             <div className="bg-white rounded-3xl p-4 shadow-xs border border-slate-100 space-y-2 text-xs">
               <h4 className="text-xs font-bold uppercase tracking-wider text-slate-500 mb-1">
@@ -1006,6 +930,240 @@ export const MobileAppView: React.FC<MobileAppViewProps> = ({
         onDeleteRoom={handleDeleteRoom}
         initialTab={buildingModalTab}
       />
+
+      {/* MODAL 1: CONFIGURE MQTT BROKER */}
+      {isMqttModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center space-x-2">
+                <Radio className="w-4 h-4 text-blue-600" />
+                <h4 className="text-sm font-bold text-slate-900">MQTT Broker Settings</h4>
+              </div>
+              <button 
+                onClick={() => setIsMqttModalOpen(false)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto space-y-3.5 text-xs">
+              {/* Presets */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-600 block mb-1">Quick Broker Presets:</label>
+                <div className="grid grid-cols-3 gap-1 text-[10px]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMqttBrokerUri('mqtt://broker.hivemq.com:1883');
+                      setMqttBrokerHost('broker.hivemq.com');
+                      setMqttBrokerPort('1883');
+                    }}
+                    className="p-1.5 rounded-xl border border-blue-200 bg-blue-50 text-blue-700 font-bold hover:bg-blue-100 transition"
+                  >
+                    HiveMQ Cloud
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMqttBrokerUri('mqtt://broker.emqx.io:1883');
+                      setMqttBrokerHost('broker.emqx.io');
+                      setMqttBrokerPort('1883');
+                    }}
+                    className="p-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 font-bold hover:bg-slate-100 transition"
+                  >
+                    EMQX Public
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMqttBrokerUri('mqtt://192.168.1.100:1883');
+                      setMqttBrokerHost('192.168.1.100');
+                      setMqttBrokerPort('1883');
+                    }}
+                    className="p-1.5 rounded-xl border border-slate-200 bg-slate-50 text-slate-700 font-bold hover:bg-slate-100 transition"
+                  >
+                    Home Assistant
+                  </button>
+                </div>
+              </div>
+
+              {/* Broker URI */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-1">Broker URI:</label>
+                <input
+                  type="text"
+                  value={mqttBrokerUri}
+                  onChange={e => setMqttBrokerUri(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl font-mono text-xs text-slate-900 focus:outline-none focus:border-blue-500"
+                  placeholder="mqtt://broker.hivemq.com:1883"
+                />
+              </div>
+
+              {/* Username & Password */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">Username (Optional):</label>
+                  <input
+                    type="text"
+                    value={mqttUsername}
+                    onChange={e => setMqttUsername(e.target.value)}
+                    placeholder="None"
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-xl font-mono text-xs text-slate-900 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-700 block mb-1">Password (Optional):</label>
+                  <input
+                    type="password"
+                    value={mqttPassword}
+                    onChange={e => setMqttPassword(e.target.value)}
+                    placeholder="None"
+                    className="w-full px-2.5 py-1.5 border border-slate-200 rounded-xl font-mono text-xs text-slate-900 focus:outline-none focus:border-blue-500"
+                  />
+                </div>
+              </div>
+
+              {/* Topic Prefix */}
+              <div>
+                <label className="text-[11px] font-bold text-slate-700 block mb-1">Topic Prefix:</label>
+                <input
+                  type="text"
+                  value={mqttTopicPrefix}
+                  onChange={e => setMqttTopicPrefix(e.target.value)}
+                  className="w-full px-3 py-2 border border-slate-200 rounded-xl font-mono text-xs text-slate-900 focus:outline-none focus:border-blue-500"
+                  placeholder="smartswitch"
+                />
+              </div>
+
+              {/* Test Connection Button */}
+              <div className="pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMqttTestStatus('testing');
+                    setTimeout(() => setMqttTestStatus('success'), 700);
+                  }}
+                  className="w-full py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5 transition"
+                >
+                  {mqttTestStatus === 'testing' ? (
+                    <span>Testing Connection...</span>
+                  ) : mqttTestStatus === 'success' ? (
+                    <span className="text-emerald-600 flex items-center space-x-1">
+                      <Check className="w-3.5 h-3.5" />
+                      <span>Connection Successful!</span>
+                    </span>
+                  ) : (
+                    <span>Test Broker Connection</span>
+                  )}
+                </button>
+              </div>
+            </div>
+
+            <div className="p-3 border-t border-slate-100 bg-slate-50/50 flex space-x-2">
+              <button
+                type="button"
+                onClick={() => setIsMqttModalOpen(false)}
+                className="flex-1 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold text-xs shadow-xs transition"
+              >
+                Save Configuration
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: WHERE TO ENTER MQTT DETAILS IN ESP32 CODE */}
+      {isEsp32CodeModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 bg-slate-900/60 backdrop-blur-xs animate-fadeIn">
+          <div className="bg-white w-full max-w-sm rounded-3xl shadow-2xl border border-slate-100 overflow-hidden flex flex-col max-h-[90vh]">
+            <div className="p-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center space-x-2">
+                <Cpu className="w-4 h-4 text-blue-600" />
+                <h4 className="text-sm font-bold text-slate-900">ESP32 MQTT Code Locations</h4>
+              </div>
+              <button 
+                onClick={() => setIsEsp32CodeModalOpen(false)}
+                className="p-1 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            <div className="p-4 overflow-y-auto space-y-3.5 text-xs">
+              <p className="text-slate-600 leading-relaxed text-[11px]">
+                To connect your physical ESP32 to your MQTT broker, open the configuration header file in your firmware folder:
+              </p>
+
+              {/* Location 1: ESP-IDF */}
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-blue-700 text-[11px]">1. For ESP-IDF Firmware:</span>
+                  <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 py-0.5 rounded font-mono">C / IDF</span>
+                </div>
+                <p className="text-slate-500 font-mono text-[10px]">
+                  📁 firmware/esp32_idf/mqtt_config.h
+                </p>
+                <p className="text-[10px] text-slate-500">
+                  Included directly by <code className="text-slate-700 font-bold">main.c</code> during startup.
+                </p>
+              </div>
+
+              {/* Location 2: Arduino */}
+              <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-amber-700 text-[11px]">2. For Arduino IDE / Core:</span>
+                  <span className="text-[10px] bg-amber-100 text-amber-800 px-1.5 py-0.5 rounded font-mono">.INO</span>
+                </div>
+                <p className="text-slate-500 font-mono text-[10px]">
+                  📁 firmware/arduino/SmartTouchSwitch_ESP32S3/
+                </p>
+                <p className="text-[10px] text-slate-500">
+                  Edit lines 20-30 in <code className="text-slate-700 font-bold">SmartTouchSwitch_ESP32S3.ino</code> or <code className="text-slate-700 font-bold">mqtt_config.h</code>.
+                </p>
+              </div>
+
+              {/* Code Snippet */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="font-bold text-slate-700 text-[11px]">Macros to Edit:</span>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(`#define CONFIG_WIFI_SSID "${wifiSsid}"\n#define CONFIG_WIFI_PASSWORD "Your_Password"\n#define CONFIG_MQTT_BROKER_URI "${mqttBrokerUri}"\n#define CONFIG_MQTT_USERNAME "${mqttUsername}"\n#define CONFIG_MQTT_PASSWORD "${mqttPassword}"`);
+                      setCopiedSnippet(true);
+                      setTimeout(() => setCopiedSnippet(false), 2500);
+                    }}
+                    className="text-blue-600 hover:text-blue-700 text-[10px] font-bold flex items-center space-x-1"
+                  >
+                    <Copy className="w-3 h-3" />
+                    <span>{copiedSnippet ? 'Copied!' : 'Copy Snippet'}</span>
+                  </button>
+                </div>
+
+                <pre className="bg-slate-900 text-emerald-400 p-3 rounded-2xl text-[10px] font-mono overflow-x-auto leading-relaxed">
+{`#define CONFIG_WIFI_SSID     "${wifiSsid}"
+#define CONFIG_WIFI_PASSWORD "Your_Password"
+
+#define CONFIG_MQTT_BROKER_URI "${mqttBrokerUri}"
+#define CONFIG_MQTT_USERNAME   "${mqttUsername}"
+#define CONFIG_MQTT_PASSWORD   "${mqttPassword}"`}
+                </pre>
+              </div>
+            </div>
+
+            <div className="p-3 border-t border-slate-100 bg-slate-50/50 flex">
+              <button
+                type="button"
+                onClick={() => setIsEsp32CodeModalOpen(false)}
+                className="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl font-bold text-xs transition"
+              >
+                Got It
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );
