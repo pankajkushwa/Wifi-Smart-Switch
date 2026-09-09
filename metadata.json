@@ -1,0 +1,6 @@
+{
+  "name": "Smart Touch Switch Ecosystem",
+  "description": "Commercial ESP32-S3 Smart Touch Switch firmware platform with dual ESP-IDF and Arduino Core implementations, FreeRTOS architecture, and mobile companion app.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
